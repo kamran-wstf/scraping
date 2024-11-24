@@ -6,12 +6,12 @@ import mongoose from "mongoose";
 // Limit the number of concurrent tasks
 const CONCURRENT_TASKS = 10;
 
-async function extractPageData(browser, url,links) {
+async function extractPageData(browser, url) {
   let page;
   try {
     // Create a new page for each URL
     page = await browser.newPage();
-    console.log("scraping link : "+links)
+    console.log("Scraping link: " + url);
 
     // Attempt to load the page with retry mechanism
     let retries = 3;
@@ -27,7 +27,11 @@ async function extractPageData(browser, url,links) {
         const pdfUrl = await page.$eval("iframe.pdf", (iframe) => iframe.src);
 
         // Return the result
-        return { tagString: "Indian culture <-> Rare books", title:title, pdfUrl:pdfUrl };
+        return {
+          tagString: "Indian culture <-> Reports and Proceedings",
+          title: title,
+          pdfUrl: pdfUrl,
+        };
       } catch (error) {
         console.error(
           `Error navigating or extracting from URL: ${url}, Retry attempts left: ${
@@ -67,26 +71,26 @@ async function processUrls() {
     browser = await puppeteer.launch();
 
     // Process URLs in batches
-    const results = [];
     for (let i = 0; i < urls.length; i += CONCURRENT_TASKS) {
       const batch = urls.slice(i, i + CONCURRENT_TASKS);
 
-      try {
-        const batchResults = await Promise.all(
-          batch.map((url,i) => extractPageData(browser, url,i))
-        );
-        results.push(...batchResults.filter((result) => result !== null));
-      } catch (error) {
-        console.error("Error processing batch:", error.message);
-      }
-    }
-
-    // Save results to MongoDB in a single batch
-    if (results.length > 0) {
-      await scrapData.insertMany(results);
-      console.log(`Saved ${results.length} records to MongoDB.`);
-    } else {
-      console.log("No data to save.");
+      await Promise.all(
+        batch.map(async (url) => {
+          try {
+            const result = await extractPageData(browser, url);
+            if (result) {
+              // Insert data into MongoDB immediately
+              await scrapData.create(result);
+              console.log(`Inserted record for URL: ${url}`);
+            }
+          } catch (error) {
+            console.error(
+              `Error scraping and inserting data for URL: ${url}`,
+              error.message
+            );
+          }
+        })
+      );
     }
   } catch (error) {
     console.error("Error processing URLs:", error.message);
@@ -98,4 +102,3 @@ async function processUrls() {
 }
 
 processUrls().catch(console.error);
-

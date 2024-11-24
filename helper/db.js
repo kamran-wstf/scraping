@@ -24,6 +24,6 @@ const DataSchema = new mongoose.Schema({
 },{versionKey:false});
 
 // Create the model
-const scrapData = mongoose.model("report", DataSchema);
+const scrapData = mongoose.model("gazette", DataSchema);
 
 export { connectToDatabase, scrapData };
